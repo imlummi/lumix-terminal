@@ -1,0 +1,20 @@
+{
+  "theme": "dark",
+  "colors": {
+    "primary": "#87d441",
+    "secondary": "#87afff", 
+    "accent": "#ff6b35",
+    "error": "#ff6b6b",
+    "success": "#51cf66",
+    "info": "#74c0fc"
+  },
+  "font": {
+    "family": "Ubuntu Mono",
+    "size": 14
+  },
+  "terminal": {
+    "prompt_style": "user@host:path$",
+    "show_colors": true,
+    "history_size": 100
+  }
+}

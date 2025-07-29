@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0c0c0c;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            overflow: hidden;
+            -webkit-app-region: no-drag;
+        }
+        
+        .terminal {
+            width: 100vw;
+            height: 100vh;
+            background-color: #0c0c0c;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .title-bar {
+            height: 28px;
+            background: #2d2d30;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            -webkit-app-region: drag;
+            border-bottom: 1px solid #1e1e1e;
+        }
+        
+        .window-controls {
+            display: flex;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+        
+        .control-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .control-button:hover {
+            opacity: 0.8;
+        }
+        
+        .close-btn {
+            background-color: #ff5f56;
+        }
+        
+        .minimize-btn {
+            background-color: #ffbd2e;
+        }
+        
+        .maximize-btn {
+            background-color: #27c93f;
+        }
+        
+        .title-text {
+            color: #cccccc;
+            font-size: 12px;
+            flex-grow: 1;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .terminal-body {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            background-color: #0c0c0c;
+            font-size: 13px;
+        }
+        
+        .prompt-line {
+            display: flex;
+            margin: 1px 0;
+            word-wrap: break-word;
+        }
+        
+        .prompt {
+            color: #ffffff;
+            font-weight: 400;
+        }
+        
+        .at-symbol {
+            color: #ffffff;
+        }
+        
+        .hostname {
+            color: #ffffff;
+            font-weight: 400;
+        }
+        
+        .path {
+            color: #ffffff;
+            font-weight: 400;
+        }
+        
+        .dollar {
+            color: #ffffff;
+            font-weight: 400;
+        }
+        
+        .command-text {
+            color: #ffffff;
+            margin-left: 4px;
+        }
+        
+        .output {
+            color: #ffffff;
+            margin: 1px 0;
+            white-space: pre-wrap;
+            font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+        }
+        
+        .error {
+            color: #ff5f87;
+        }
+        
+        .success {
+            color: #ffffff;
+        }
+        
+        .info {
+            color: #ffffff;
+        }
+        
+        .input-container {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        
+        #command-input {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            outline: none;
+            flex: 1;
+            margin-left: 4px;
+            caret-color: transparent;
+            cursor: none;
+        }
+
+        #command-input::selection {
+            background-color: #264f78;
+            color: #ffffff;
+        }
+
+        #command-input::-moz-selection {
+            background-color: #264f78;
+            color: #ffffff;
+        }
+        
+        .cursor {
+            position: absolute;
+            background-color: #ffffff;
+            width: 7px;
+            height: 15px;
+            animation: blink 1s infinite;
+            pointer-events: none;
+            transition: left 0.05s ease-out;
+            z-index: 10;
+        }
+
+        .cursor.hide {
+            opacity: 0;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .neofetch-container {
+            display: flex;
+            gap: 24px;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+            margin: 8px 0;
+        }
+        
+        .neofetch-logo {
+            color: #ff6b35;
+            white-space: pre;
+            font-weight: 400;
+            font-size: 11px;
+            line-height: 1.1;
+        }
+        
+        .neofetch-info {
+            flex: 1;
+        }
+        
+        .neofetch-title {
+            color: #00d787;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+        
+        .neofetch-line {
+            margin: 2px 0;
+            font-size: 13px;
+        }
+        
+        .neofetch-label {
+            color: #5fafff;
+            font-weight: 500;
+            display: inline-block;
+            width: 100px;
+        }
+        
+        .neofetch-value {
+            color: #ffffff;
+        }
+
+        .color-bar {
+            display: flex;
+            margin-top: 12px;
+            gap: 1px;
+        }
+        
+        .color-block {
+            width: 16px;
+            height: 12px;
+        }
+
+        .terminal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .terminal-body::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 3px;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb:hover {
+            background: #505050;
+        }
+
+        .loading {
+            color: #ffbd2e;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="title-bar">
+            <div class="window-controls">
+                <button class="control-button close-btn" id="close-btn"></button>
+                <button class="control-button minimize-btn" id="minimize-btn"></button>
+                <button class="control-button maximize-btn" id="maximize-btn"></button>
+            </div>
+            <div class="title-text" id="title-text">Terminal</div>
+        </div>
+        
+        <div class="terminal-body" id="terminal-body">
+            <div class="output">Last login: loading... on console</div>
+            <div class="output"></div>
+            
+            <div class="input-container">
+                <span class="prompt" id="username">loading...</span>
+                <span class="at-symbol">@</span>
+                <span class="hostname" id="hostname">loading...</span>
+                <span class="path">:~</span>
+                <span class="dollar">$</span>
+                <input type="text" id="command-input" autofocus spellcheck="false">
+                <div class="cursor" id="cursor"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const { ipcRenderer } = require('electron');
+    const os = require('os');
+    
+    let systemInfo = {};
+    let config = {};
+    let currentPath = '~';
+    let selectionTimeout = null;
+    let isPowerShellMode = true;
+    
+    // Window controls
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('close-btn').addEventListener('click', () => {
+            ipcRenderer.invoke('window-close');
+        });
+        
+        document.getElementById('minimize-btn').addEventListener('click', () => {
+            ipcRenderer.invoke('window-minimize');
+        });
+        
+        document.getElementById('maximize-btn').addEventListener('click', () => {
+            ipcRenderer.invoke('window-maximize');
+        });
+    });
+    
+    // Initialize PowerShell
+    async function initPowerShell() {
+    if (isPowerShellMode) {
+        try {
+            addOutput('Testing PowerShell availability...', 'loading');
+            const isAvailable = await ipcRenderer.invoke('test-powershell');
+            
+            // Remove the testing message
+            const outputs = document.querySelectorAll('.output');
+            const lastOutput = outputs[outputs.length - 1];
+            if (lastOutput && lastOutput.textContent.includes('Testing PowerShell')) {
+                lastOutput.remove();
+            }
+            
+            if (isAvailable) {
+                addOutput('PowerShell ready', 'success');
+            } else {
+                addOutput('PowerShell not available, using fallback mode', 'error');
+                isPowerShellMode = false;
+            }
+        } catch (error) {
+            console.error('Failed to initialize PowerShell:', error);
+            addOutput('PowerShell initialization failed, using fallback mode', 'error');
+            isPowerShellMode = false;
+        }
+    }
+}
+
+
+    // Update the path display
+    function updatePromptPath() {
+        const pathElements = document.querySelectorAll('.path');
+        pathElements.forEach(el => {
+            // Always show Linux-style path
+            let displayPath = currentPath;
+            if (displayPath.includes('\\')) {
+                // Convert Windows path to Linux style
+                displayPath = displayPath.replace(/\\/g, '/');
+                // Replace home directory with ~
+                const homeDir = os.homedir().replace(/\\/g, '/');
+                if (displayPath.startsWith(homeDir)) {
+                    displayPath = displayPath.replace(homeDir, '~');
+                }
+                // Remove drive letter if present
+                displayPath = displayPath.replace(/^[A-Z]:/, '');
+            }
+            el.textContent = `:${displayPath}`;
+        });
+        
+        // Update title bar
+        const titleElement = document.getElementById('title-text');
+        if (titleElement) {
+            let displayPath = currentPath;
+            if (displayPath.includes('\\')) {
+                displayPath = displayPath.replace(/\\/g, '/');
+                const homeDir = os.homedir().replace(/\\/g, '/');
+                if (displayPath.startsWith(homeDir)) {
+                    displayPath = displayPath.replace(homeDir, '~');
+                }
+                displayPath = displayPath.replace(/^[A-Z]:/, '');
+            }
+            titleElement.textContent = `${systemInfo.username}@${systemInfo.hostname}: ${displayPath}`;
+        }
+    }
+    
+    // Initialize
+    async function init() {
+        systemInfo = await ipcRenderer.invoke('get-system-info');
+        config = await ipcRenderer.invoke('read-config');
+        
+        document.getElementById('username').textContent = systemInfo.username;
+        document.getElementById('hostname').textContent = systemInfo.hostname;
+        
+        // Fix the login message
+        const loginMessage = document.querySelector('.output');
+        if (loginMessage && loginMessage.textContent.includes('loading')) {
+            loginMessage.textContent = `Last login: ${new Date().toDateString()} on console`;
+        }
+
+        // Initialize PowerShell
+        await initPowerShell();
+        
+        // Set initial path to Linux style
+        currentPath = '~';
+        updatePromptPath();
+    }
+    
+    const commands = {
+        'help': () => {
+            return `Available commands:
+help       - Show this help message
+clear      - Clear the terminal
+toggle-ps  - Toggle between real and fake PowerShell
+neofetch   - Display system information with logo
+${isPowerShellMode ? 'All other commands are executed via real PowerShell' : 'Fallback mode - limited fake commands available'}`;
+        },
+        
+        'clear': () => {
+            const terminalBody = document.getElementById('terminal-body');
+            
+            // Get display path
+            let displayPath = currentPath;
+            if (displayPath.includes('\\')) {
+                displayPath = displayPath.replace(/\\/g, '/');
+                const homeDir = os.homedir().replace(/\\/g, '/');
+                if (displayPath.startsWith(homeDir)) {
+                    displayPath = displayPath.replace(homeDir, '~');
+                }
+                displayPath = displayPath.replace(/^[A-Z]:/, '');
+            }
+            
+            terminalBody.innerHTML = `
+                <div class="input-container">
+                    <span class="prompt" id="username">${systemInfo.username}</span>
+                    <span class="at-symbol">@</span>
+                    <span class="hostname" id="hostname">${systemInfo.hostname}</span>
+                    <span class="path">:${displayPath}</span>
+                    <span class="dollar">$</span>
+                    <input type="text" id="command-input" autofocus spellcheck="false">
+                    <div class="cursor" id="cursor"></div>
+                </div>
+            `;
+            setTimeout(() => {
+                setupInput();
+                updateCursor();
+                focusInput();
+            }, 10);
+            return null;
+        },
+        
+        'toggle-ps': () => {
+            isPowerShellMode = !isPowerShellMode;
+            if (isPowerShellMode) {
+                initPowerShell();
+            }
+            return `PowerShell mode: ${isPowerShellMode ? 'Real' : 'Fake'}`;
+        },
+        
+        'neofetch': async () => {
+            const logo = await ipcRenderer.invoke('read-logo');
+            const uptimeHours = Math.floor(systemInfo.uptime / 60);
+            const uptimeMinutes = systemInfo.uptime % 60;
+            
+            return {
+                type: 'neofetch',
+                logo: logo,
+                info: [
+                    { label: 'OS', value: `${systemInfo.platform} ${systemInfo.arch}` },
+                    { label: 'Host', value: systemInfo.hostname },
+                    { label: 'Kernel', value: systemInfo.release },
+                    { label: 'Uptime', value: `${uptimeHours}h ${uptimeMinutes}m` },
+                    { label: 'Shell', value: systemInfo.shell },
+                    { label: 'Terminal', value: systemInfo.terminal },
+                    { label: 'CPU', value: `${systemInfo.cpus} (${systemInfo.cores} cores)` },
+                    { label: 'Memory', value: `${systemInfo.usedmem}GB / ${systemInfo.totalmem}GB` },
+                    { label: 'PowerShell', value: isPowerShellMode ? 'Enabled' : 'Disabled' }
+                ]
+            };
+        },
+        
+        // Fallback commands for when PowerShell is disabled
+        'ls': () => 'Documents  Downloads  Pictures  config.json  logo.txt',
+        'pwd': () => `/home/${systemInfo.username}`,
+        'whoami': () => systemInfo.username,
+        'hostname': () => systemInfo.hostname,
+        'date': () => new Date().toString(),
+        'exit': () => {
+            ipcRenderer.invoke('window-close');
+            return 'Goodbye!';
+        }
+    };
+    
+    let commandHistory = [];
+    let historyIndex = -1;
+    
+    function focusInput() {
+        const input = document.getElementById('command-input');
+        if (input) {
+            input.focus();
+        }
+    }
+    
+    function updateCursor() {
+        const input = document.getElementById('command-input');
+        const cursor = document.getElementById('cursor');
+        if (!input || !cursor) return;
+        
+        const hasSelection = input.selectionStart !== input.selectionEnd;
+        
+        if (hasSelection) {
+            cursor.classList.add('hide');
+            return;
+        } else {
+            cursor.classList.remove('hide');
+        }
+        
+        const temp = document.createElement('span');
+        temp.style.visibility = 'hidden';
+        temp.style.position = 'absolute';
+        temp.style.whiteSpace = 'pre';
+        temp.style.font = window.getComputedStyle(input).font;
+        temp.textContent = input.value.substring(0, input.selectionStart || input.value.length);
+        document.body.appendChild(temp);
+        
+        const textWidth = temp.offsetWidth;
+        document.body.removeChild(temp);
+        
+        const inputRect = input.getBoundingClientRect();
+        const containerRect = input.parentElement.getBoundingClientRect();
+        cursor.style.left = (inputRect.left - containerRect.left + textWidth) + 'px';
+    }
+    
+    function setupInput() {
+        const input = document.getElementById('command-input');
+        if (!input) return;
+        
+        const newInput = input.cloneNode(true);
+        input.parentNode.replaceChild(newInput, input);
+        
+        newInput.style.userSelect = 'text';
+        newInput.style.webkitUserSelect = 'text';
+        
+        let isSelecting = false;
+        
+        newInput.addEventListener('mousedown', (e) => {
+            isSelecting = true;
+        });
+        
+        newInput.addEventListener('mouseup', (e) => {
+            isSelecting = false;
+            updateCursor();
+        });
+        
+        newInput.addEventListener('mousemove', (e) => {
+            if (isSelecting) {
+                updateCursor();
+            }
+        });
+        
+        newInput.addEventListener('input', () => {
+            clearTimeout(selectionTimeout);
+            updateCursor();
+        });
+        
+        newInput.addEventListener('keyup', (e) => {
+            clearTimeout(selectionTimeout);
+            updateCursor();
+        });
+        
+        newInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(selectionTimeout);
+            updateCursor();
+        });
+        
+        newInput.addEventListener('focus', updateCursor);
+        newInput.addEventListener('blur', updateCursor);
+        
+        newInput.addEventListener('selectstart', () => {
+            clearTimeout(selectionTimeout);
+        });
+        
+        newInput.addEventListener('select', () => {
+            clearTimeout(selectionTimeout);
+            updateCursor();
+        });
+        
+        newInput.addEventListener('keydown', async (e) => {
+            clearTimeout(selectionTimeout);
+            
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const command = newInput.value.trim();
+                newInput.value = '';
+                
+                if (command) {
+                    commandHistory.push(command);
+                    historyIndex = commandHistory.length;
+                    await executeCommand(command);
+                } else {
+                    addPrompt();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    newInput.value = commandHistory[historyIndex];
+                    newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+                    updateCursor();
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    newInput.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    newInput.value = '';
+                }
+                newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+                updateCursor();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
+                setTimeout(updateCursor, 1);
+            }
+            
+            setTimeout(updateCursor, 1);
+        });
+        
+        focusInput();
+        updateCursor();
+    }
+    
+    async function executeCommand(commandLine) {
+    addCommandDisplay(commandLine);
+    
+    // Handle special frontend commands first
+    if (commandLine.trim() === 'clear') {
+        commands.clear();
+        return;
+    }
+    
+    if (isPowerShellMode && commandLine.trim() && !['help', 'toggle-ps', 'neofetch'].includes(commandLine.split(' ')[0])) {
+        try {
+            // Use single command execution for better reliability
+            const result = await ipcRenderer.invoke('execute-powershell-single', commandLine);
+            
+            if (result.success) {
+                if (result.output) {
+                    addOutput(result.output);
+                }
+                
+                // Keep the Linux-style path display
+            } else {
+                addOutput(result.error || 'Command failed', 'error');
+            }
+        } catch (error) {
+            addOutput(`Error: ${error.message}`, 'error');
+        }
+    } else {
+        // Handle built-in commands
+        const parts = commandLine.split(' ');
+        const command = parts[0];
+        const args = parts.slice(1);
+        
+        if (commands[command]) {
+            try {
+                const result = await commands[command](args);
+                if (result !== null) {
+                    if (result && result.type === 'neofetch') {
+                        addNeofetchOutput(result);
+                    } else {
+                        addOutput(result || '');
+                    }
+                }
+            } catch (error) {
+                addOutput(`Error: ${error.message}`, 'error');
+            }
+        } else {
+            addOutput(`'${command}' is not recognized as an internal or external command.`, 'error');
+        }
+    }
+    
+    addPrompt();
+    scrollToBottom();
+}
+        
+    
+    function addCommandDisplay(command) {
+        const terminalBody = document.getElementById('terminal-body');
+        const commandDiv = document.createElement('div');
+        commandDiv.className = 'prompt-line';
+        
+        // Get display path
+        let displayPath = currentPath;
+        if (displayPath.includes('\\')) {
+            displayPath = displayPath.replace(/\\/g, '/');
+            const homeDir = os.homedir().replace(/\\/g, '/');
+            if (displayPath.startsWith(homeDir)) {
+                displayPath = displayPath.replace(homeDir, '~');
+            }
+            displayPath = displayPath.replace(/^[A-Z]:/, '');
+        }
+        
+        commandDiv.innerHTML = `
+            <span class="prompt">${systemInfo.username}</span>
+            <span class="at-symbol">@</span>
+            <span class="hostname">${systemInfo.hostname}</span>
+            <span class="path">:${displayPath}</span>
+            <span class="dollar">$</span>
+            <span class="command-text">${command}</span>
+        `;
+        terminalBody.insertBefore(commandDiv, terminalBody.lastElementChild);
+    }
+    
+    function addOutput(text, className = '') {
+        const terminalBody = document.getElementById('terminal-body');
+        const outputDiv = document.createElement('div');
+        outputDiv.className = `output ${className}`;
+        outputDiv.textContent = text;
+        terminalBody.insertBefore(outputDiv, terminalBody.lastElementChild);
+    }
+    
+    function addNeofetchOutput(neofetchData) {
+        const terminalBody = document.getElementById('terminal-body');
+        const neofetchDiv = document.createElement('div');
+        neofetchDiv.className = 'neofetch-container';
+        
+        const logoDiv = document.createElement('div');
+        logoDiv.className = 'neofetch-logo';
+        logoDiv.textContent = neofetchData.logo;
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'neofetch-info';
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'neofetch-title';
+       titleDiv.textContent = `${systemInfo.username}@${systemInfo.hostname}`;
+       infoDiv.appendChild(titleDiv);
+       
+       const separator = document.createElement('div');
+       separator.textContent = '-'.repeat(`${systemInfo.username}@${systemInfo.hostname}`.length);
+       separator.style.color = '#00d787';
+       infoDiv.appendChild(separator);
+       
+       neofetchData.info.forEach(item => {
+           const lineDiv = document.createElement('div');
+           lineDiv.className = 'neofetch-line';
+           lineDiv.innerHTML = `<span class="neofetch-label">${item.label}:</span> <span class="neofetch-value">${item.value}</span>`;
+           infoDiv.appendChild(lineDiv);
+       });
+       
+       const colorBar = document.createElement('div');
+       colorBar.className = 'color-bar';
+       const colors = ['#000000', '#ff5f87', '#00d787', '#ffaf00', '#5fafff', '#ff79c6', '#8be9fd', '#f8f8f2'];
+       colors.forEach(color => {
+           const block = document.createElement('div');
+           block.className = 'color-block';
+           block.style.backgroundColor = color;
+           colorBar.appendChild(block);
+       });
+       infoDiv.appendChild(colorBar);
+       
+       neofetchDiv.appendChild(logoDiv);
+       neofetchDiv.appendChild(infoDiv);
+       
+       terminalBody.insertBefore(neofetchDiv, terminalBody.lastElementChild);
+   }
+   
+       function addPrompt() {
+        const terminalBody = document.getElementById('terminal-body');
+        const inputContainer = document.createElement('div');
+        inputContainer.className = 'input-container';
+        
+        // Get display path
+        let displayPath = currentPath;
+        if (displayPath.includes('\\')) {
+            displayPath = displayPath.replace(/\\/g, '/');
+            const homeDir = os.homedir().replace(/\\/g, '/');
+            if (displayPath.startsWith(homeDir)) {
+                displayPath = displayPath.replace(homeDir, '~');
+            }
+            displayPath = displayPath.replace(/^[A-Z]:/, '');
+        }
+        
+        inputContainer.innerHTML = `
+            <span class="prompt">${systemInfo.username}</span>
+            <span class="at-symbol">@</span>
+            <span class="hostname">${systemInfo.hostname}</span>
+            <span class="path">:${displayPath}</span>
+            <span class="dollar">$</span>
+            <input type="text" id="command-input" autofocus spellcheck="false">
+            <div class="cursor" id="cursor"></div>
+        `;
+        
+        const oldInput = terminalBody.querySelector('.input-container');
+        if (oldInput) {
+            terminalBody.removeChild(oldInput);
+        }
+        
+        terminalBody.appendChild(inputContainer);
+        setTimeout(() => {
+            setupInput();
+            updateCursor();
+        }, 5);
+    }
+   
+   function scrollToBottom() {
+       const terminalBody = document.getElementById('terminal-body');
+       terminalBody.scrollTop = terminalBody.scrollHeight;
+   }
+   
+   // Initialize the terminal
+   init().then(() => {
+       setTimeout(() => {
+           setupInput();
+           updateCursor();
+       }, 50);
+   });
+   
+   // Handle window focus and clicks
+   document.addEventListener('click', (e) => {
+       if (!e.target.classList.contains('control-button') && e.target.id !== 'command-input') {
+           setTimeout(focusInput, 10);
+       }
+   });
+   
+   window.addEventListener('focus', focusInput);
+   
+   // Global keydown handler
+   document.addEventListener('keydown', (e) => {
+       const input = document.getElementById('command-input');
+       if (input && document.activeElement !== input && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+           input.focus();
+       }
+   });
+   </script>
+</body>
+</html>

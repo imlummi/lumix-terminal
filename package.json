@@ -1,0 +1,15 @@
+{
+  "name": "lerminal",
+  "version": "1.0.0",
+  "description": "hi there",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "devDependencies": {
+    "electron": "^27.0.0"
+  },
+  "author": "lummi",
+  "license": "MIT"
+}
