@@ -640,17 +640,37 @@ ${isPowerShellMode ? 'All other commands are executed via real PowerShell' : 'Fa
         return;
     }
     
+    // Handle cd command specially
+    if (commandLine.trim().startsWith('cd ') || commandLine.trim() === 'cd') {
+        const targetDir = commandLine.trim() === 'cd' ? '~' : commandLine.substring(3).trim();
+        
+        try {
+            const result = await ipcRenderer.invoke('change-directory', targetDir);
+            if (result.success) {
+                currentPath = result.newPath;
+                updatePromptPath();
+                addOutput(''); // Empty output like real terminals
+            } else {
+                addOutput(`cd: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            addOutput(`cd: ${error.message}`, 'error');
+        }
+        
+        addPrompt();
+        scrollToBottom();
+        return;
+    }
+    
+    // Handle other commands with PowerShell or built-ins
     if (isPowerShellMode && commandLine.trim() && !['help', 'toggle-ps', 'neofetch'].includes(commandLine.split(' ')[0])) {
         try {
-            // Use single command execution for better reliability
             const result = await ipcRenderer.invoke('execute-powershell-single', commandLine);
             
             if (result.success) {
                 if (result.output) {
                     addOutput(result.output);
                 }
-                
-                // Keep the Linux-style path display
             } else {
                 addOutput(result.error || 'Command failed', 'error');
             }

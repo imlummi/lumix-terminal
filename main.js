@@ -118,100 +118,147 @@ function createPowerShellSession() {
   }
 }
 
-// Simple command execution without complex markers
-ipcMain.handle('execute-powershell', async (event, command) => {
-  if (isProcessing) {
-    return { output: '', error: 'Another command is already running', success: false };
-  }
-
-  if (!powershellProcess) {
-    const created = await createPowerShellSession();
-    if (!created) {
-      return { output: '', error: 'Failed to start PowerShell', success: false };
+// Handle directory change commands specially
+ipcMain.handle('change-directory', async (event, targetDir) => {
+  let newDir;
+  
+  try {
+    // Handle special cases
+    if (targetDir === '~' || targetDir === '') {
+      newDir = os.homedir();
+    } else if (targetDir === '..') {
+      newDir = path.dirname(currentDirectory);
+    } else if (targetDir === '.') {
+      newDir = currentDirectory;
+    } else if (path.isAbsolute(targetDir)) {
+      newDir = targetDir;
+    } else {
+      newDir = path.resolve(currentDirectory, targetDir);
     }
+
+    // Normalize the path
+    newDir = path.normalize(newDir);
+
+    // Check if directory exists
+    if (fs.existsSync(newDir)) {
+      const stats = fs.statSync(newDir);
+      if (stats.isDirectory()) {
+        currentDirectory = newDir;
+        return { success: true, newPath: currentDirectory, error: '' };
+      } else {
+        return { success: false, newPath: currentDirectory, error: `'${targetDir}' is not a directory` };
+      }
+    } else {
+      return { success: false, newPath: currentDirectory, error: `Directory '${targetDir}' does not exist` };
+    }
+  } catch (error) {
+    return { success: false, newPath: currentDirectory, error: error.message };
   }
+});
 
-  isProcessing = true;
+// Get current directory
+ipcMain.handle('get-current-directory', async () => {
+  return currentDirectory;
+});
 
+// Execute single PowerShell commands with proper working directory
+ipcMain.handle('execute-powershell-single', async (event, command) => {
   return new Promise((resolve) => {
+    const psCommand = process.platform === 'win32' ? 
+      (fs.existsSync('C:\\Program Files\\PowerShell\\7\\pwsh.exe') ? 'pwsh' : 'powershell') : 
+      'pwsh';
+    
+    const args = ['-NoLogo', '-NoProfile', '-Command', command];
+
+    console.log(`Executing: ${psCommand} in directory: ${currentDirectory}`);
+    
+    const child = spawn(psCommand, args, {
+      cwd: currentDirectory,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env
+    });
+
     let output = '';
     let errorOutput = '';
-    let completed = false;
 
-    const timeout = setTimeout(() => {
-      if (!completed) {
-        completed = true;
-        cleanup();
-        isProcessing = false;
-        resolve({ output: output || 'Command timed out', error: 'Timeout', success: false });
-      }
-    }, 10000); // 10 second timeout
-
-    const cleanup = () => {
-      if (powershellProcess) {
-        powershellProcess.stdout.removeAllListeners('data');
-        powershellProcess.stderr.removeAllListeners('data');
-      }
-      clearTimeout(timeout);
-    };
-
-    const onStdout = (data) => {
+    child.stdout.on('data', (data) => {
       output += data.toString();
-    };
+    });
 
-    const onStderr = (data) => {
+    child.stderr.on('data', (data) => {
       errorOutput += data.toString();
-    };
+    });
 
-    const onError = (err) => {
-      if (!completed) {
-        completed = true;
-        cleanup();
-        isProcessing = false;
-        resolve({ output: '', error: err.message, success: false });
+    child.on('close', (code) => {
+      // Clean up output
+      output = output.replace(/\r\n/g, '\n').trim();
+      errorOutput = errorOutput.replace(/\r\n/g, '\n').trim();
+      
+      if (code !== 0 && errorOutput) {
+        resolve({ output: output, error: errorOutput, success: false });
+      } else {
+        resolve({ output: output, error: '', success: true });
       }
-    };
+    });
 
-    // Set up listeners
-    powershellProcess.stdout.on('data', onStdout);
-    powershellProcess.stderr.on('data', onStderr);
-    powershellProcess.on('error', onError);
+    child.on('error', (err) => {
+      resolve({ output: '', error: err.message, success: false });
+    });
 
-    // Execute command and wait for result
-    try {
-      powershellProcess.stdin.write(`${command}\n`);
-      
-      // Give some time for output, then resolve
-      setTimeout(() => {
-        if (!completed) {
-          completed = true;
-          cleanup();
-          isProcessing = false;
-          
-          if (errorOutput && errorOutput.trim()) {
-            resolve({ output: output.trim(), error: errorOutput.trim(), success: false });
-          } else {
-            resolve({ output: output.trim(), error: '', success: true });
-          }
-        }
-      }, 1000); // Wait 1 second for output
-      
-    } catch (error) {
-      completed = true;
-      cleanup();
-      isProcessing = false;
-      resolve({ output: '', error: error.message, success: false });
-    }
+    // Timeout protection
+    setTimeout(() => {
+      child.kill('SIGTERM');
+      resolve({ output: '', error: 'Command timeout', success: false });
+    }, 15000); // 15 second timeout
   });
 });
 
-// Alternative: Execute single commands (more reliable)
-ipcMain.handle('execute-powershell-single', async (event, command) => {
+// Test PowerShell availability
+ipcMain.handle('test-powershell', async () => {
   return new Promise((resolve) => {
-    const psCommand = process.platform === 'win32' ? 'powershell' : 'pwsh';
-    const args = ['-NoLogo', '-NoProfile', '-Command', command];
+    const psCommand = process.platform === 'win32' ? 
+      (fs.existsSync('C:\\Program Files\\PowerShell\\7\\pwsh.exe') ? 'pwsh' : 'powershell') : 
+      'pwsh';
+    
+    const child = spawn(psCommand, ['-Command', 'Write-Host "PowerShell Test"'], { 
+      stdio: 'ignore',
+      timeout: 3000
+    });
+    
+    child.on('close', (code) => {
+      resolve(code === 0);
+    });
+    
+    child.on('error', () => {
+      resolve(false);
+    });
 
-    const child = spawn(psCommand, args, {
+    setTimeout(() => {
+      child.kill();
+      resolve(false);
+    }, 3000);
+  });
+});
+
+// Enhanced directory listing with better formatting
+ipcMain.handle('list-directory', async (event, dirPath = null) => {
+  const targetDir = dirPath || currentDirectory;
+  
+  return new Promise((resolve) => {
+    const psCommand = process.platform === 'win32' ? 
+      (fs.existsSync('C:\\Program Files\\PowerShell\\7\\pwsh.exe') ? 'pwsh' : 'powershell') : 
+      'pwsh';
+    
+    // PowerShell command to list directory with Unix-like format
+    const command = `Get-ChildItem -Path "${targetDir}" | ForEach-Object { 
+      $size = if ($_.PSIsContainer) { "DIR" } else { $_.Length }
+      $date = $_.LastWriteTime.ToString("MMM dd HH:mm")
+      $name = $_.Name
+      if ($_.PSIsContainer) { $name = $name + "/" }
+      "{0,-10} {1,-20} {2}" -f $size, $date, $name
+    }`;
+
+    const child = spawn(psCommand, ['-NoLogo', '-NoProfile', '-Command', command], {
       cwd: currentDirectory,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -228,8 +275,8 @@ ipcMain.handle('execute-powershell-single', async (event, command) => {
     });
 
     child.on('close', (code) => {
-      if (errorOutput && errorOutput.trim()) {
-        resolve({ output: output.trim(), error: errorOutput.trim(), success: false });
+      if (errorOutput) {
+        resolve({ output: '', error: errorOutput.trim(), success: false });
       } else {
         resolve({ output: output.trim(), error: '', success: true });
       }
@@ -239,69 +286,10 @@ ipcMain.handle('execute-powershell-single', async (event, command) => {
       resolve({ output: '', error: err.message, success: false });
     });
 
-    // Timeout
     setTimeout(() => {
       child.kill();
       resolve({ output: '', error: 'Command timeout', success: false });
-    }, 8000);
-  });
-});
-
-// Get current directory
-ipcMain.handle('get-current-directory', async () => {
-  try {
-    const result = await new Promise((resolve) => {
-      const psCommand = process.platform === 'win32' ? 'powershell' : 'pwsh';
-      const child = spawn(psCommand, ['-NoLogo', '-NoProfile', '-Command', 'Get-Location | Select-Object -ExpandProperty Path'], {
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-
-      let output = '';
-      child.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      child.on('close', () => {
-        resolve(output.trim());
-      });
-
-      child.on('error', () => {
-        resolve(currentDirectory);
-      });
-
-      setTimeout(() => {
-        child.kill();
-        resolve(currentDirectory);
-      }, 3000);
-    });
-
-    if (result && result !== currentDirectory) {
-      currentDirectory = result;
-    }
-    return currentDirectory;
-  } catch (error) {
-    return currentDirectory;
-  }
-});
-
-// Test PowerShell availability
-ipcMain.handle('test-powershell', async () => {
-  return new Promise((resolve) => {
-    const psCommand = process.platform === 'win32' ? 'powershell' : 'pwsh';
-    const child = spawn(psCommand, ['-Command', 'Write-Host "PowerShell Test"'], { stdio: 'ignore' });
-    
-    child.on('close', (code) => {
-      resolve(code === 0);
-    });
-    
-    child.on('error', () => {
-      resolve(false);
-    });
-
-    setTimeout(() => {
-      child.kill();
-      resolve(false);
-    }, 3000);
+    }, 5000);
   });
 });
 
@@ -327,7 +315,7 @@ app.on('before-quit', () => {
   }
 });
 
-// Keep the existing IPC handlers...
+// System info handler
 ipcMain.handle('get-system-info', () => {
   const totalMem = Math.round(os.totalmem() / 1024 / 1024 / 1024);
   const freeMem = Math.round(os.freemem() / 1024 / 1024 / 1024);
